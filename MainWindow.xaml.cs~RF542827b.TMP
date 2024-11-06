@@ -69,7 +69,7 @@ namespace zuanke8
         }
 
         private bool _isLoading;
-        internal int _currentPage;
+        private int _currentPage;
         private const int PageSize = 20;
 
         private bool _isRefreshing;
@@ -152,7 +152,7 @@ namespace zuanke8
             }
         }
 
-        public void ApplySettings()
+        private void ApplySettings()
         {
             // 保存当前滚动位置
             var scrollViewer = GetScrollViewer(PostsListView);
@@ -306,7 +306,7 @@ namespace zuanke8
                         }
 
                         // 如果是按最后回复时间排序，需要重新排序
-                        if (_orderByLastReply && newPosts.Where(x=>!x.IsHidden).Max(x=>x.LastReplyTime) > _postManager.GetPosts(_orderByLastReply).Max(x=>x.LastReplyTime))
+                        if (_orderByLastReply && newPosts.Select(x=>!x.IsHidden).Max(x=>x.LastReplyTime) > _postManager.GetPosts(_orderByLastReply).Max(x=>x.LastReplyTime))
                         {
                             var sortedPosts = Posts.OrderByDescending(p => p.LastReplyTime).ToList();
                             Posts.Clear();
@@ -357,7 +357,7 @@ namespace zuanke8
 
         private void UpdateSortButtonTooltip()
         {
-            SortButton.ToolTip = _orderByLastReply ? "最回复时间排序" : "按发帖时间排序";
+            SortButton.ToolTip = _orderByLastReply ? "按最回复时间排序" : "按发帖时间排序";
         }
 
         private void PostsListView_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -481,7 +481,7 @@ namespace zuanke8
             UpdateCounts();
         }
 
-        internal void LoadPage(int pageIndex)
+        private void LoadPage(int pageIndex)
         {
             if (_isLoading) return;
             _isLoading = true;
@@ -497,6 +497,7 @@ namespace zuanke8
                     .Select(p => 
                     {
                         var viewModel = new PostViewModel(p);
+                        // 应用高亮规则
                         viewModel.IsHighlight = _settings.Highlights.Any(keyword =>
                             p.Title.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
                             p.Author.Contains(keyword, StringComparison.OrdinalIgnoreCase));

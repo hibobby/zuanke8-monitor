@@ -96,7 +96,7 @@ namespace zuanke8
             // 如果数量超过限制，按时间排序后只保留最新的
             if (posts.Count > MaxPostsCount)
             {
-                posts = posts.OrderByDescending(p => p.LastReplyTime)
+                posts = posts.OrderByDescending(p => p.PostTime)
                             .Take(MaxPostsCount)
                             .ToList();
                 

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Text.Json;
+using System.Diagnostics;
 
 namespace zuanke8
 {
@@ -28,12 +29,13 @@ namespace zuanke8
                     var json = File.ReadAllText(PostsFile);
                     var posts = JsonSerializer.Deserialize<List<Post>>(json) ?? new List<Post>();
                     CleanOldPosts(posts);
+                    Debug.WriteLine($"加载了 {posts.Count} 个帖子");
                     return posts;
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Load posts error: {ex.Message}");
+                Debug.WriteLine($"Load posts error: {ex.Message}");
             }
             return new List<Post>();
         }
@@ -44,11 +46,11 @@ namespace zuanke8
             {
                 var json = JsonSerializer.Serialize(_posts, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(PostsFile, json);
-                System.Diagnostics.Debug.WriteLine($"Saved {_posts.Count} posts to file");
+                Debug.WriteLine($"保存了 {_posts.Count} 个帖子到文件");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Save posts error: {ex.Message}");
+                Debug.WriteLine($"Save posts error: {ex.Message}");
             }
         }
 
@@ -59,9 +61,11 @@ namespace zuanke8
                 bool hasChanges = false;
                 foreach (var post in newPosts)
                 {
+                    Debug.WriteLine($"检查帖子 {post.PostId}: {post.Title}");
                     var existingPost = _posts.FirstOrDefault(p => p.PostId == post.PostId);
                     if (existingPost == null)
                     {
+                        Debug.WriteLine($"新帖子：{post.Title}");
                         post.IsRead = false;
                         post.IsHidden = false;
                         post.IsFavorite = false;
@@ -70,6 +74,7 @@ namespace zuanke8
                     }
                     else
                     {
+                        Debug.WriteLine($"更新帖子：{post.Title}");
                         existingPost.LastReplyTime = post.LastReplyTime;
                         existingPost.LastReplyUser = post.LastReplyUser;
                         existingPost.ReplyCount = post.ReplyCount;
@@ -83,6 +88,7 @@ namespace zuanke8
                 {
                     CleanOldPosts(_posts);
                     SavePosts();
+                    Debug.WriteLine($"保存后总帖子数：{_posts.Count}");
                 }
             }
         }
@@ -90,17 +96,17 @@ namespace zuanke8
         private void CleanOldPosts(List<Post> posts)
         {
             // 先按时间清理
-            //var threeDaysAgo = DateTime.Now.AddDays(-3);
-            //posts.RemoveAll(p => p.PostTime < threeDaysAgo);
+            var threeDaysAgo = DateTime.Now.AddDays(-7);
+            posts.RemoveAll(p => p.PostTime < threeDaysAgo);
 
             // 如果数量超过限制，按时间排序后只保留最新的
             if (posts.Count > MaxPostsCount)
             {
-                posts = posts.OrderByDescending(p => p.LastReplyTime)
+                posts = posts.OrderByDescending(p => p.PostTime)
                             .Take(MaxPostsCount)
                             .ToList();
                 
-                System.Diagnostics.Debug.WriteLine($"清理后保留 {posts.Count} 个帖子");
+                Debug.WriteLine($"清理后保留 {posts.Count} 个帖子");
             }
         }
 
@@ -116,11 +122,6 @@ namespace zuanke8
 
                 return new ObservableCollection<Post>(orderedPosts);
             }
-        }
-
-        public ObservableCollection<Post> GetAllPosts()
-        {
-            return new ObservableCollection<Post>(_posts);
         }
 
         public void UpdatePost(Post post)
@@ -152,7 +153,9 @@ namespace zuanke8
         {
             lock (_lock)
             {
-                return _posts.FirstOrDefault(p => p.PostId == postId);
+                var post = _posts.FirstOrDefault(p => p.PostId == postId);
+                Debug.WriteLine($"查找帖子 {postId}: {(post != null ? "存在" : "不存在")}");
+                return post;
             }
         }
     }

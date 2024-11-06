@@ -58,6 +58,12 @@ namespace zuanke8
             if (!_settings.Blacklist.Contains(BlacklistInput.Text))
             {
                 _settings.Blacklist.Add(BlacklistInput.Text);
+                
+                // 通知主窗口刷新显示
+                if (Owner is MainWindow mainWindow)
+                {
+                    mainWindow.ApplySettings();
+                }
             }
             BlacklistInput.Clear();
         }
@@ -67,6 +73,15 @@ namespace zuanke8
             if (sender is FrameworkElement element && element.DataContext is string item)
             {
                 _settings.Blacklist.Remove(item);
+                
+                // 通知主窗口重新加载并应用设置
+                if (Owner is MainWindow mainWindow)
+                {
+                    mainWindow.Posts.Clear();
+                    mainWindow._currentPage = 0;
+                    mainWindow.LoadPage(0);
+                    mainWindow.ApplySettings();
+                }
             }
         }
 

@@ -294,16 +294,16 @@
                                           HorizontalAlignment="Right">
                                     <!-- 作者名字，允许截断 -->
                                     <TextBlock Text="{Binding Author}"
-                                             FontSize="10.5"
+                                             FontSize="11.5"
                                              Foreground="#7C4DFF"
-                                             Width="62"
+                                             Width="80"
                                              HorizontalAlignment="Left"
                                              TextTrimming="CharacterEllipsis"/>
                                     <TextBlock Text="•"
                                              Foreground="#CCCCCC"
                                              Margin="4,0"/>
                                     <!-- 回复数 -->
-                                    <TextBlock Width="35">
+                                    <TextBlock Width="40">
                                         <Run Text="{Binding ReplyCount}"
                                              
                                              Foreground="#7C4DFF"/>
