@@ -2,23 +2,58 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows;
+using System.ComponentModel;
 
 namespace zuanke8
 {
-    public class AppSettings
+    public class AppSettings : INotifyPropertyChanged
     {
         private static readonly string ConfigPath = Path.Combine(
             Path.GetDirectoryName(Application.ResourceAssembly.Location) ?? "",
             "config.ini");
 
-        public int CrawlFrequency { get; set; } = 30;
+        private int _crawlFrequency = 30;
+        public int CrawlFrequency
+        {
+            get => _crawlFrequency;
+            set
+            {
+                if (_crawlFrequency != value)
+                {
+                    _crawlFrequency = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
         public ObservableCollection<string> Blacklist { get; set; } = new();
         public ObservableCollection<string> Highlights { get; set; } = new();
         public bool EnableNotification { get; set; } = true;
         public bool OnlyHighlightNotification { get; set; } = false;
 
+        private bool _isTopMost;
+        public bool IsTopMost
+        {
+            get => _isTopMost;
+            set
+            {
+                if (_isTopMost != value)
+                {
+                    _isTopMost = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
         private static AppSettings? _instance;
         public static AppSettings Instance => _instance ??= Load();
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
 
         private static AppSettings Load()
         {
@@ -51,6 +86,7 @@ namespace zuanke8
                             if (key == "CrawlFrequency") settings.CrawlFrequency = int.Parse(value);
                             else if (key == "EnableNotification") settings.EnableNotification = bool.Parse(value);
                             else if (key == "OnlyHighlightNotification") settings.OnlyHighlightNotification = bool.Parse(value);
+                            else if (key == "IsTopMost") settings.IsTopMost = bool.Parse(value);
                             break;
                         case "Blacklist":
                             settings.Blacklist.Add(value);
@@ -80,6 +116,7 @@ namespace zuanke8
                 writer.WriteLine($"CrawlFrequency={CrawlFrequency}");
                 writer.WriteLine($"EnableNotification={EnableNotification}");
                 writer.WriteLine($"OnlyHighlightNotification={OnlyHighlightNotification}");
+                writer.WriteLine($"IsTopMost={IsTopMost}");
 
                 // 保存黑名单
                 writer.WriteLine("\n[Blacklist]");

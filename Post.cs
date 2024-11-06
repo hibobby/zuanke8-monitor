@@ -15,6 +15,9 @@ namespace zuanke8
         public int ViewCount { get; set; }
         public bool HasAttachment { get; set; }
         public bool IsHighlight { get; set; }
+        public bool IsRead { get; set; }
+        public bool IsHidden { get; set; }
+        public bool IsFavorite { get; set; }
 
         public bool ContainsKeyword(string keyword)
         {

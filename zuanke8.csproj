@@ -35,12 +35,37 @@
       <DependentUpon>Settings.xaml</DependentUpon>
     </Compile>
     
+    <Page Include="Login.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Compile Include="Login.xaml.cs">
+      <DependentUpon>Login.xaml</DependentUpon>
+    </Compile>
+    
     <Compile Include="Post.cs" />
     <Compile Include="AppSettings.cs" />
+    <Compile Include="CookieManager.cs" />
+    <Compile Include="ForumCrawler.cs" />
+    <Compile Include="PostManager.cs" />
+    <Compile Include="Services\PostsCache.cs" />
+    <Compile Include="ViewModels\PostViewModel.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="png\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Microsoft.mshtml">
+      <HintPath>$(MSBuildProgramFiles32)\Microsoft.NET\Primary Interop Assemblies\Microsoft.mshtml.dll</HintPath>
+      <EmbedInteropTypes>true</EmbedInteropTypes>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2210.55" />
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
   </ItemGroup>
 
 </Project>

@@ -3,181 +3,194 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Controls;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using zuanke8.Services;
+using zuanke8.ViewModels;
+using System.Diagnostics;
+using System.Threading.Tasks;
 
 namespace zuanke8
 {
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class MainWindow : Window, INotifyPropertyChanged
     {
         private readonly AppSettings _settings;
-        private ObservableCollection<Post> _allPosts;
-        public ObservableCollection<Post> Posts { get; set; }
+        private readonly PostManager _postManager;
+        private bool _orderByLastReply = true;
+        public ObservableCollection<PostViewModel> Posts { get; set; }
+        private readonly ForumCrawler _crawler;
+
+        private int _unreadCount;
+        public int UnreadCount
+        {
+            get => _unreadCount;
+            set
+            {
+                if (_unreadCount != value)
+                {
+                    _unreadCount = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        private int _totalCount;
+        public int TotalCount
+        {
+            get => _totalCount;
+            set
+            {
+                if (_totalCount != value)
+                {
+                    _totalCount = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        private bool _showFavoritesOnly;
+        public bool ShowFavoritesOnly
+        {
+            get => _showFavoritesOnly;
+            set
+            {
+                if (_showFavoritesOnly != value)
+                {
+                    _showFavoritesOnly = value;
+                    OnPropertyChanged();
+                    ApplySettings();
+                }
+            }
+        }
+
+        private bool _isLoading;
+        private int _currentPage;
+        private const int PageSize = 20;
+
+        private bool _isRefreshing;
+        public bool IsRefreshing
+        {
+            get => _isRefreshing;
+            set
+            {
+                if (_isRefreshing != value)
+                {
+                    _isRefreshing = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        private double _lastVerticalOffset;
+        private const double PullToRefreshThreshold = -50;
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
 
         public MainWindow()
         {
             InitializeComponent();
+            DataContext = this;
             _settings = AppSettings.Instance;
-            Posts = new ObservableCollection<Post>();
-            InitializeTestData();
-            ApplySettings();
-
+            _postManager = new PostManager();
+            _currentPage = 0;
+            
+            // 初始化 Posts 集合
+            Posts = new ObservableCollection<PostViewModel>();
+            PostsListView.ItemsSource = Posts;
+            
+            _orderByLastReply = false;  // 默认按发帖时间排序
+            _crawler = new ForumCrawler(UpdatePosts, _postManager);
+            
             // 监听设置变化
             _settings.Blacklist.CollectionChanged += (s, e) => ApplySettings();
             _settings.Highlights.CollectionChanged += (s, e) => ApplySettings();
+            _settings.PropertyChanged += Settings_PropertyChanged;
+
+            // 加载已有帖子并应用设置
+            LoadPage(_currentPage);
+            ApplySettings();  // 确保应用设置
+            UpdateCounts();
+
+            // 检查登录状态并启动定时刷新
+            if (CookieManager.CheckLoginStatus())
+            {
+                _crawler.Start(_settings.CrawlFrequency);
+            }
+            else
+            {
+                MessageBox.Show("请先登录！", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+
+            // 更新排序按钮提示
+            UpdateSortButtonTooltip();
+
+            // 应用置顶状态
+            this.Topmost = _settings.IsTopMost;
         }
 
-        private void InitializeTestData()
+        private void Settings_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            _allPosts = new ObservableCollection<Post>
+            if (e.PropertyName == nameof(AppSettings.CrawlFrequency))
             {
-                new Post
+                // 更新爬取频率
+                if (CookieManager.CheckLoginStatus())
                 {
-                    Title = "爱奇艺越来越过了",
-                    Author = "v1y20086688",
-                    PostTime = DateTime.Parse("2024-11-6 21:01"),
-                    ReplyCount = 0,
-                    ViewCount = 69,
-                    LastReplyUser = "v1y20086688",
-                    LastReplyTime = DateTime.Parse("2024-11-6 21:01")
-                },
-                new Post
-                {
-                    Title = "我研究了下，PLUS有洗车洗衣服服的，如果洗车无刷洗，优先选洗衣比较划算",
-                    Author = "夜半窗外转",
-                    PostTime = DateTime.Parse("2024-11-3 00:58"),
-                    ReplyCount = 25,
-                    ViewCount = 1319,
-                    LastReplyUser = "古茗231",
-                    LastReplyTime = DateTime.Parse("2024-11-6 21:00")
-                },
-                new Post
-                {
-                    Title = "服了，京东家政天天出去嗨",
-                    Author = "wilwri",
-                    PostTime = DateTime.Parse("2024-11-6 20:51"),
-                    ReplyCount = 4,
-                    ViewCount = 299,
-                    LastReplyUser = "我来看看的",
-                    LastReplyTime = DateTime.Parse("2024-11-6 20:59")
-                },
-                new Post
-                {
-                    Title = "【每日必看】双十一各大平台隐藏优惠券合集",
-                    Author = "优惠券达人",
-                    PostTime = DateTime.Parse("2024-11-6 20:45"),
-                    ReplyCount = 156,
-                    ViewCount = 2891,
-                    LastReplyUser = "省钱小能手",
-                    LastReplyTime = DateTime.Parse("2024-11-6 20:58")
-                },
-                new Post
-                {
-                    Title = "建议收藏！2024年各大电商平台优惠日历",
-                    Author = "折扣研究员",
-                    PostTime = DateTime.Parse("2024-11-6 20:30"),
-                    ReplyCount = 89,
-                    ViewCount = 1567,
-                    LastReplyUser = "购物达人",
-                    LastReplyTime = DateTime.Parse("2024-11-6 20:57")
-                },
-                new Post
-                {
-                    Title = "白条还款日期选择攻略，让你的信用卡更省心",
-                    Author = "理财专家",
-                    PostTime = DateTime.Parse("2024-11-6 20:20"),
-                    ReplyCount = 45,
-                    ViewCount = 876,
-                    LastReplyUser = "金融小白",
-                    LastReplyTime = DateTime.Parse("2024-11-6 20:56")
-                },
-                new Post
-                {
-                    Title = "实测：各大平台相似商品价格对比，别被忽悠了",
-                    Author = "明察秋毫",
-                    PostTime = DateTime.Parse("2024-11-6 20:10"),
-                    ReplyCount = 67,
-                    ViewCount = 1234,
-                    LastReplyUser = "理性消费",
-                    LastReplyTime = DateTime.Parse("2024-11-6 20:55")
-                },
-                new Post
-                {
-                    Title = "【整理】京东PLUS会员权益最新变化，值得续费吗",
-                    Author = "会员研究所",
-                    PostTime = DateTime.Parse("2024-11-6 20:00"),
-                    ReplyCount = 234,
-                    ViewCount = 3456,
-                    LastReplyUser = "权益达人",
-                    LastReplyTime = DateTime.Parse("2024-11-6 20:54")
-                },
-                new Post
-                {
-                    Title = "618购物节提前预热，各平台活动规则解析",
-                    Author = "购物指南",
-                    PostTime = DateTime.Parse("2024-11-6 19:50"),
-                    ReplyCount = 178,
-                    ViewCount = 2567,
-                    LastReplyUser = "剁手党",
-                    LastReplyTime = DateTime.Parse("2024-11-6 20:53")
-                },
-                new Post
-                {
-                    Title = "信用卡还款技巧：如何合理利用免息期",
-                    Author = "金融顾问",
-                    PostTime = DateTime.Parse("2024-11-6 19:40"),
-                    ReplyCount = 145,
-                    ViewCount = 1987,
-                    LastReplyUser = "理财新手",
-                    LastReplyTime = DateTime.Parse("2024-11-6 20:52")
-                },
-                new Post
-                {
-                    Title = "【经验分享】如何避免网购中的常见陷阱",
-                    Author = "网购老手",
-                    PostTime = DateTime.Parse("2024-11-6 19:30"),
-                    ReplyCount = 198,
-                    ViewCount = 2765,
-                    LastReplyUser = "精明眼",
-                    LastReplyTime = DateTime.Parse("2024-11-6 20:51")
-                },
-                new Post
-                {
-                    Title = "各大平台优惠券叠加规则详解",
-                    Author = "券妈妈",
-                    PostTime = DateTime.Parse("2024-11-6 19:20"),
-                    ReplyCount = 167,
-                    ViewCount = 2345,
-                    LastReplyUser = "省钱达人",
-                    LastReplyTime = DateTime.Parse("2024-11-6 20:50")
+                    _crawler.Start(_settings.CrawlFrequency);
                 }
-            };
-            
-            ApplySettings();
+            }
         }
 
         private void ApplySettings()
         {
-            // 清空当前显示的帖子
+            // 保存当前滚动位置
+            var scrollViewer = GetScrollViewer(PostsListView);
+            var currentOffset = scrollViewer?.VerticalOffset ?? 0;
+
+            // 重新加载数据而不是过滤现有数据
+            _currentPage = 0;
             Posts.Clear();
 
-            foreach (var post in _allPosts)
+            // 获取所有帖子并应用过滤和高亮
+            var allPosts = _postManager.GetPosts(_orderByLastReply)
+                .Where(p => !p.IsHidden)
+                .Where(p => !_settings.Blacklist.Any(keyword => 
+                    p.Title.Contains(keyword, StringComparison.OrdinalIgnoreCase) || 
+                    p.Author.Contains(keyword, StringComparison.OrdinalIgnoreCase)))
+                .Where(p => !ShowFavoritesOnly || p.IsFavorite)
+                .Select(p => 
+                {
+                    var viewModel = new PostViewModel(p);
+                    // 应用高亮规则
+                    viewModel.IsHighlight = _settings.Highlights.Any(keyword =>
+                        p.Title.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
+                        p.Author.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+                    return viewModel;
+                });
+
+            var pagedPosts = allPosts.Skip(_currentPage * PageSize).Take(PageSize);
+            foreach (var post in pagedPosts)
             {
-                // 检查是否在黑名单中
-                bool isBlacklisted = _settings.Blacklist.Any(keyword => post.ContainsKeyword(keyword));
-                if (isBlacklisted) continue;
-
-                // 检查是否需要高亮
-                post.IsHighlight = _settings.Highlights.Any(keyword => post.ContainsKeyword(keyword));
-
-                // 添加到显示列表
                 Posts.Add(post);
             }
 
-            // 更新ListView的数据源
-            PostsListView.ItemsSource = null;
-            PostsListView.ItemsSource = Posts;
+            UpdateCounts();
+            Debug.WriteLine($"应用设置后：显示 {Posts.Count} 个帖子，未读 {UnreadCount}，总数 {TotalCount}");
+
+            // 恢复滚动位置
+            if (scrollViewer != null)
+            {
+                scrollViewer.ScrollToVerticalOffset(currentOffset);
+            }
         }
 
         private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -192,7 +205,25 @@ namespace zuanke8
 
         private void LoginButton_Click(object sender, RoutedEventArgs e)
         {
-            // TODO: 实现登录逻辑
+            if (CookieManager.CheckLoginStatus())
+            {
+                if (MessageBox.Show("是否退出登录？", "提示", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                {
+                    CookieManager.ClearCookie();
+                    _crawler.Stop();
+                    UpdateLoginStatus();
+                    MessageBox.Show("已退出登录", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            else
+            {
+                var loginWindow = new Login
+                {
+                    Owner = this,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner
+                };
+                loginWindow.ShowDialog();
+            }
         }
 
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
@@ -206,6 +237,314 @@ namespace zuanke8
             
             // 设置窗口关闭后重新应用设置
             ApplySettings();
+        }
+
+        private void UpdateLoginStatus()
+        {
+            bool isLoggedIn = CookieManager.CheckLoginStatus();
+            var loginButton = this.FindName("LoginButton") as Button;
+            if (loginButton != null)
+            {
+                loginButton.Content = isLoggedIn ? "\uE77B" : "\uE77B";
+                loginButton.ToolTip = isLoggedIn ? "已登录" : "未登录";
+                loginButton.Foreground = isLoggedIn ? 
+                    new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7C4DFF")) :
+                    new SolidColorBrush((Color)ColorConverter.ConvertFromString("#b2bec3"));
+            }
+        }
+
+        private void UpdatePosts(ObservableCollection<Post> newPosts)
+        {
+            if (newPosts == null || newPosts.Count == 0) return;
+
+            try
+            {
+                Debug.WriteLine($"收到新帖子：{newPosts.Count} 个");
+                
+                // 更新 PostManager
+                _postManager.AddPosts(newPosts);
+
+                // 清空当前显示的帖子
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    Posts.Clear();
+                    _currentPage = 0;
+                    
+                    // 重新加载第一页
+                    var allPosts = _postManager.GetPosts(_orderByLastReply)
+                        .Where(p => !p.IsHidden)
+                        .Where(p => !ShowFavoritesOnly || p.IsFavorite)
+                        .Select(p => new PostViewModel(p));
+
+                    var pagedPosts = allPosts.Skip(_currentPage * PageSize).Take(PageSize);
+                    foreach (var post in pagedPosts)
+                    {
+                        Posts.Add(post);
+                    }
+
+                    UpdateCounts();
+                    Debug.WriteLine($"更新显示：{Posts.Count} 个帖子，未读 {UnreadCount}，总数 {TotalCount}");
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Update posts error: {ex.Message}");
+                MessageBox.Show($"更新帖子失败：{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                IsRefreshing = false;
+            }
+        }
+
+        public void OnLoginSuccess()
+        {
+            // 更新登录状态
+            UpdateLoginStatus();
+            
+            // 登录成功后立即刷新一次
+            if (!_isRefreshing)
+            {
+                IsRefreshing = true;
+                _ = _crawler.FetchPosts();
+            }
+        }
+
+        private void SortButton_Click(object sender, RoutedEventArgs e)
+        {
+            _orderByLastReply = !_orderByLastReply;
+            _currentPage = 0;
+            Posts.Clear();
+            LoadPage(_currentPage);
+            ApplySettings();
+            UpdateSortButtonTooltip();
+        }
+
+        private void UpdateSortButtonTooltip()
+        {
+            SortButton.ToolTip = _orderByLastReply ? "按最回复时间排序" : "按发帖时间排序";
+        }
+
+        private void PostsListView_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (e.OriginalSource is FrameworkElement element && 
+                element.DataContext is PostViewModel post)
+            {
+                try
+                {
+                    // 在默认浏览器中打开链接
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = post.Url,
+                        UseShellExecute = true
+                    });
+
+                    // 标记为已读
+                    post.IsRead = true;
+                    _postManager.UpdatePost(new Post
+                    {
+                        PostId = post.PostId,
+                        IsRead = true,
+                        IsHidden = post.IsHidden,
+                        IsFavorite = post.IsFavorite
+                    });
+
+                    // 刷新界面
+                    PostsListView.Items.Refresh();
+                    UpdateCounts();  // 更新未读计数
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"打开链接失败：{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        private void UpdateCounts()
+        {
+            var allPosts = _postManager.GetPosts(_orderByLastReply);
+            var visiblePosts = allPosts.Where(p => !p.IsHidden);
+            if (ShowFavoritesOnly)
+            {
+                visiblePosts = visiblePosts.Where(p => p.IsFavorite);
+            }
+
+            UnreadCount = visiblePosts.Count(p => !p.IsRead);
+            TotalCount = visiblePosts.Count();
+        }
+
+        private void FavoriteButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement element && element.DataContext is PostViewModel post)
+            {
+                // 保存当前滚动位置
+                var scrollViewer = GetScrollViewer(PostsListView);
+                var currentOffset = scrollViewer?.VerticalOffset ?? 0;
+
+                post.IsFavorite = !post.IsFavorite;
+                _postManager.UpdatePost(new Post
+                {
+                    PostId = post.PostId,
+                    IsRead = post.IsRead,
+                    IsHidden = post.IsHidden,
+                    IsFavorite = post.IsFavorite
+                });
+
+                // 如果在收藏模式下，需要重新应用过滤
+                if (ShowFavoritesOnly)
+                {
+                    ApplySettings();
+                }
+
+                // 恢复滚动位置
+                if (scrollViewer != null)
+                {
+                    scrollViewer.ScrollToVerticalOffset(currentOffset);
+                }
+            }
+        }
+
+        private void HideButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement element && element.DataContext is PostViewModel post)
+            {
+                // 保存当前滚动位置
+                var scrollViewer = GetScrollViewer(PostsListView);
+                var currentOffset = scrollViewer?.VerticalOffset ?? 0;
+
+                // 更新帖子状态
+                post.IsHidden = true;
+                _postManager.UpdatePost(new Post
+                {
+                    PostId = post.PostId,
+                    IsRead = post.IsRead,
+                    IsHidden = true,
+                    IsFavorite = post.IsFavorite
+                });
+
+                // 从当前显示列表中移除该帖子
+                Posts.Remove(post);
+                
+                // 更新计数
+                UpdateCounts();
+
+                // 恢复滚动位置
+                if (scrollViewer != null)
+                {
+                    scrollViewer.ScrollToVerticalOffset(currentOffset);
+                }
+            }
+        }
+
+        private void FavoriteFilterButton_Click(object sender, RoutedEventArgs e)
+        {
+            ShowFavoritesOnly = !ShowFavoritesOnly;
+            // 重新加载数据
+            _currentPage = 0;
+            Posts.Clear();
+            LoadPage(_currentPage);
+            UpdateCounts();
+        }
+
+        private void LoadPage(int pageIndex)
+        {
+            if (_isLoading) return;
+            _isLoading = true;
+
+            try
+            {
+                var allPosts = _postManager.GetPosts(_orderByLastReply)
+                    .Where(p => !p.IsHidden)
+                    .Where(p => !_settings.Blacklist.Any(keyword => 
+                        p.Title.Contains(keyword, StringComparison.OrdinalIgnoreCase) || 
+                        p.Author.Contains(keyword, StringComparison.OrdinalIgnoreCase)))
+                    .Where(p => !ShowFavoritesOnly || p.IsFavorite)
+                    .Select(p => 
+                    {
+                        var viewModel = new PostViewModel(p);
+                        // 应用高亮规则
+                        viewModel.IsHighlight = _settings.Highlights.Any(keyword =>
+                            p.Title.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
+                            p.Author.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+                        return viewModel;
+                    });
+
+                var pagedPosts = allPosts.Skip(pageIndex * PageSize).Take(PageSize);
+                foreach (var post in pagedPosts)
+                {
+                    Posts.Add(post);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Load page error: {ex.Message}");
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+
+        private void PostsListView_ScrollChanged(object sender, ScrollChangedEventArgs e)
+        {
+            var scrollViewer = e.OriginalSource as ScrollViewer;
+            if (scrollViewer == null) return;
+
+            // 无限滚动
+            if (scrollViewer.VerticalOffset >= scrollViewer.ScrollableHeight - 100)
+            {
+                var totalPages = (_postManager.GetPosts(_orderByLastReply).Count + PageSize - 1) / PageSize;
+                if (!_isLoading && _currentPage < totalPages - 1)
+                {
+                    _currentPage++;
+                    LoadPage(_currentPage);
+                }
+            }
+        }
+
+        private void RefreshButton_Click(object sender, RoutedEventArgs e)
+        {
+            Debug.WriteLine("点击刷新按钮");
+            if (!_isRefreshing)
+            {
+                if (CookieManager.CheckLoginStatus())
+                {
+                    IsRefreshing = true;
+                    _ = _crawler.FetchPosts();  // 直接调用 ForumCrawler 的爬取方法
+                }
+                else
+                {
+                    MessageBox.Show("请先登录！", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+            else
+            {
+                Debug.WriteLine("正在刷新中，忽略点击");
+            }
+        }
+
+        private void TopMostButton_Click(object sender, RoutedEventArgs e)
+        {
+            this.Topmost = !this.Topmost;
+            _settings.IsTopMost = this.Topmost;  // 保存状态
+            _settings.Save();  // 立即保存到文件
+            TopMostButton.ToolTip = this.Topmost ? "取消置顶" : "窗口置顶";
+        }
+
+        // 添加获取 ScrollViewer 的辅助方法
+        private ScrollViewer GetScrollViewer(DependencyObject depObj)
+        {
+            if (depObj is ScrollViewer scrollViewer)
+                return scrollViewer;
+
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(depObj); i++)
+            {
+                var child = VisualTreeHelper.GetChild(depObj, i);
+                var result = GetScrollViewer(child);
+                if (result != null)
+                    return result;
+            }
+            return null;
         }
     }
 }

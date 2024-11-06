@@ -36,27 +36,129 @@
 
                 <!-- 标题栏 -->
                 <Grid>
-                    <TextBlock Text="论坛监控" 
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Text="ZK8" 
                              FontSize="15" 
                              FontWeight="SemiBold" 
                              Foreground="#B8C0E0"
                              VerticalAlignment="Center"/>
                     
-                    <StackPanel Orientation="Horizontal" 
-                              HorizontalAlignment="Right">
+                    <StackPanel Grid.Column="1" 
+                                Orientation="Horizontal" 
+                                HorizontalAlignment="Left"
+                                Margin="12,0,0,0">
+                        <TextBlock VerticalAlignment="Center"
+                                  Foreground="#7C4DFF">
+                            <Run Text="{Binding UnreadCount}"/>
+                        </TextBlock>
+                        <TextBlock Text=" / " 
+                                  Foreground="#CCCCCC"
+                                  VerticalAlignment="Center"
+                                  Margin="2,0"/>
+                        <TextBlock VerticalAlignment="Center"
+                                  Foreground="#999999">
+                            <Run Text="{Binding TotalCount}"/>
+                        </TextBlock>
+                    </StackPanel>
+                    
+                    <StackPanel Grid.Column="2" 
+                                Orientation="Horizontal" 
+                                HorizontalAlignment="Right">
+                        <!-- 刷新按钮 -->
+                        <Button x:Name="RefreshButton"
+                                Content="&#xE72C;"
+                                Click="RefreshButton_Click"
+                                ToolTip="刷新"
+                                Margin="0,0,4,0">
+                            <Button.RenderTransformOrigin>
+                                <Point X="0.5" Y="0.5"/>
+                            </Button.RenderTransformOrigin>
+                            <Button.RenderTransform>
+                                <RotateTransform/>
+                            </Button.RenderTransform>
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource IconButtonStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsRefreshing}" Value="True">
+                                            <DataTrigger.EnterActions>
+                                                <BeginStoryboard Name="RotateButtonStoryboard">
+                                                    <Storyboard>
+                                                        <DoubleAnimation 
+                                                            Storyboard.TargetProperty="RenderTransform.Angle"
+                                                            From="0" To="360" Duration="0:0:1"
+                                                            RepeatBehavior="Forever"/>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </DataTrigger.EnterActions>
+                                            <DataTrigger.ExitActions>
+                                                <RemoveStoryboard BeginStoryboardName="RotateButtonStoryboard"/>
+                                            </DataTrigger.ExitActions>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                        
+                        <!-- 置顶按钮 -->
+                        <Button x:Name="TopMostButton"
+                                Content="&#xE840;"
+                                Click="TopMostButton_Click"
+                                ToolTip="窗口置顶"
+                                Margin="0,0,4,0">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource IconButtonStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=Window}, Path=Topmost}" Value="True">
+                                            <Setter Property="Foreground" Value="#FF4081"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                        
+                        <!-- 收藏过滤按钮 -->
+                        <Button x:Name="FavoriteFilterButton"
+                                Content="&#xE734;"
+                                Click="FavoriteFilterButton_Click"
+                                ToolTip="显示收藏"
+                                Margin="0,0,4,0">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource IconButtonStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ShowFavoritesOnly}" Value="True">
+                                            <Setter Property="Foreground" Value="#FF4081"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                        
+                        <!-- 排序按钮 -->
+                        <Button Style="{StaticResource IconButtonStyle}"
+                                x:Name="SortButton"
+                                Content="&#xE8CB;"
+                                Click="SortButton_Click"
+                                ToolTip="切换排序方式"
+                                Margin="0,0,4,0"/>
+                        
                         <!-- 登录按钮 -->
                         <Button Style="{StaticResource IconButtonStyle}"
                                 Content="&#xE77B;"
                                 Click="LoginButton_Click"
                                 ToolTip="登录"
-                                Margin="0,0,8,0"/>
+                                Margin="0,0,4,0"/>
                         
                         <!-- 设置按钮 -->
                         <Button Style="{StaticResource IconButtonStyle}"
                                 Content="&#xE713;"
                                 Click="SettingsButton_Click"
                                 ToolTip="设置"
-                                Margin="0,0,8,0"/>
+                                Margin="0,0,4,0"/>
                         
                         <!-- 关闭按钮 -->
                         <Button Style="{StaticResource IconButtonStyle}"
@@ -69,9 +171,38 @@
                 <!-- 帖子列表 -->
                 <ListView Grid.Row="1"
                          Name="PostsListView"
-                         Style="{StaticResource ModernListViewStyle}"
-                         ItemContainerStyle="{StaticResource ListViewItemStyle}"
+                         VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling"
+                         VirtualizingPanel.ScrollUnit="Pixel"
+                         ScrollViewer.IsDeferredScrollingEnabled="True"
+                         ScrollViewer.ScrollChanged="PostsListView_ScrollChanged"
+                         MouseLeftButtonUp="PostsListView_MouseLeftButtonUp"
                          Margin="0,10,0,0">
+                    <ListView.Style>
+                        <Style TargetType="ListView" BasedOn="{StaticResource ModernListViewStyle}">
+                            <Style.Resources>
+                                <ControlTemplate x:Key="EmptyTemplate" TargetType="ListView">
+                                    <TextBlock Text="暂无内容"
+                                             HorizontalAlignment="Center"
+                                             VerticalAlignment="Center"
+                                             Foreground="#999999"/>
+                                </ControlTemplate>
+                            </Style.Resources>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Items.Count, RelativeSource={RelativeSource Self}}" Value="0">
+                                    <Setter Property="Template" Value="{StaticResource EmptyTemplate}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ListView.Style>
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem" BasedOn="{StaticResource ListViewItemStyle}"/>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <VirtualizingStackPanel />
+                        </ItemsPanelTemplate>
+                    </ListView.ItemsPanel>
                     <ListView.ItemTemplate>
                         <DataTemplate>
                             <Grid>
@@ -80,27 +211,81 @@
                                     <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
 
-                                <!-- 标题 -->
-                                <TextBlock Text="{Binding Title}"
-                                          FontSize="13.5"
-                                          TextWrapping="Wrap"
-                                          LineHeight="20"
-                                          Margin="0,0,0,10">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsHighlight}" Value="True">
-                                                    <Setter Property="Foreground" Value="#7C4DFF"/>
-                                                    <Setter Property="FontWeight" Value="SemiBold"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding IsHighlight}" Value="False">
-                                                    <Setter Property="Foreground" Value="#333333"/>
-                                                    <Setter Property="FontWeight" Value="Normal"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
+                                <!-- 标题和操作按钮 -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    
+                                    <!-- 标题 -->
+                                    <TextBlock Grid.Column="0"
+                                              Margin="0,0,8,10"
+                                              TextWrapping="Wrap"
+                                              IsHitTestVisible="False">
+                                        <Run Text="{Binding Title}"
+                                             FontSize="13.5">
+                                            <Run.TextDecorations>
+                                                <TextDecorationCollection>
+                                                    <TextDecoration Location="Underline"/>
+                                                </TextDecorationCollection>
+                                            </Run.TextDecorations>
+                                            <Run.Style>
+                                                <Style TargetType="Run">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsHighlight}" Value="True">
+                                                            <Setter Property="Foreground" Value="#7C4DFF"/>
+                                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Run.Style>
+                                        </Run>
+                                        <TextBlock Text=" 新"
+                                                 FontSize="12"
+                                                 Foreground="#FF4081"
+                                                 FontWeight="Bold"
+                                                 IsHitTestVisible="False">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsRead}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </TextBlock>
+
+                                    <!-- 操作按钮 -->
+                                    <StackPanel Grid.Column="1" 
+                                                Orientation="Horizontal"
+                                                VerticalAlignment="Top">
+                                        <Button Content="&#xE734;"
+                                                Click="FavoriteButton_Click"
+                                                ToolTip="收藏"
+                                                Width="24"
+                                                Height="24"
+                                                Margin="0,0,4,0">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource IconButtonStyle}">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsFavorite}" Value="True">
+                                                            <Setter Property="Foreground" Value="#FF4081"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                        <Button Content="&#xE711;"
+                                                Click="HideButton_Click"
+                                                ToolTip="不再显示"
+                                                Style="{StaticResource IconButtonStyle}"
+                                                Width="24"
+                                                Height="24"/>
+                                    </StackPanel>
+                                </Grid>
 
                                 <!-- 底部信息 -->
                                 <StackPanel Grid.Row="1" 
@@ -120,7 +305,7 @@
                                     <TextBlock Text=" • "
                                              Foreground="#CCCCCC"
                                              Margin="4,0"/>
-                                    <TextBlock Text="{Binding LastReplyTime, StringFormat={}{0:HH:mm}}"
+                                    <TextBlock Text="{Binding PostTime, StringFormat={}{0:HH:mm}}"
                                              FontSize="11.5"
                                              Foreground="#999999"/>
                                 </StackPanel>

@@ -104,10 +104,12 @@
             <Style x:Key="ListViewItemStyle" TargetType="ListViewItem">
                 <Setter Property="Margin" Value="0,0,0,8"/>
                 <Setter Property="Padding" Value="12"/>
+                <Setter Property="Cursor" Value="Hand"/>
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="ListViewItem">
-                            <Border CornerRadius="10"
+                            <Border x:Name="Border"
+                                    CornerRadius="10"
                                     Margin="{TemplateBinding Margin}"
                                     Padding="{TemplateBinding Padding}"
                                     BorderThickness="1">
@@ -127,28 +129,15 @@
                                 </Border.Style>
                                 <ContentPresenter/>
                             </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Border" Property="Background" Value="#F8F7FF"/>
+                                    <Setter TargetName="Border" Property="BorderBrush" Value="#E6E0FF"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
                         </ControlTemplate>
                     </Setter.Value>
                 </Setter>
-                <Style.Triggers>
-                    <Trigger Property="IsMouseOver" Value="True">
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="ListViewItem">
-                                    <Border CornerRadius="10"
-                                            Margin="{TemplateBinding Margin}"
-                                            Padding="{TemplateBinding Padding}"
-                                            Background="#F8F7FF"
-                                            BorderThickness="1"
-                                            BorderBrush="#E6E0FF">
-                                        <ContentPresenter/>
-                                    </Border>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                        <Setter Property="Cursor" Value="Hand"/>
-                    </Trigger>
-                </Style.Triggers>
             </Style>
 
             <Style x:Key="SettingsGroupStyle" TargetType="GroupBox">
