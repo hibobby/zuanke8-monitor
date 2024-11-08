@@ -287,7 +287,7 @@ namespace zuanke8
                 // 移除脚本标签及内容
                 html = Regex.Replace(html, @"<script[\s\S]*?</script>", "", RegexOptions.IgnoreCase);
                 
-                // 移除 ignore_js_op 标签
+                // 移除 ignore_js_op 标签但保留内容
                 html = Regex.Replace(html, @"<ignore_js_op>|</ignore_js_op>", "");
                 
                 // 处理图片
@@ -317,10 +317,20 @@ namespace zuanke8
                 });
                 
                 // 处理链接
-                html = Regex.Replace(html, @"<a\s+href=""(?!http)([^""]+)""", m => 
+                html = Regex.Replace(html, @"<a\s+href=""([^""]+)""[^>]*>(.*?)</a>", m => 
                 {
                     var href = m.Groups[1].Value;
-                    return $@"<a href=""https://www.zuanke8.com/{href}"" target=""_blank""";
+                    var text = m.Groups[2].Value;
+                    
+                    // 如果是相对链接，转换为完整链接
+                    if (!href.StartsWith("http"))
+                    {
+                        href = href.StartsWith("/") ? 
+                            $"https://www.zuanke8.com{href}" : 
+                            $"https://www.zuanke8.com/{href}";
+                    }
+                    
+                    return $@"<a href=""{href}"" target=""_blank"">{text}</a>";
                 });
 
                 // 移除所有 class 和 id 属性

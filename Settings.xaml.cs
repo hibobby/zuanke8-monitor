@@ -22,6 +22,7 @@ namespace zuanke8
             HighlightView.ItemsSource = _settings.Highlights;
             EnableNotificationCheckBox.IsChecked = _settings.EnableNotification;
             OnlyHighlightNotificationCheckBox.IsChecked = _settings.OnlyHighlightNotification;
+            BarkUrlInput.Text = _settings.BarkUrl;
 
             // 添加输入框回车事件
             BlacklistInput.KeyDown += (s, e) => 
@@ -110,6 +111,7 @@ namespace zuanke8
             _settings.CrawlFrequency = (int)FrequencySlider.Value;
             _settings.EnableNotification = EnableNotificationCheckBox.IsChecked ?? false;
             _settings.OnlyHighlightNotification = OnlyHighlightNotificationCheckBox.IsChecked ?? false;
+            _settings.BarkUrl = BarkUrlInput.Text?.Trim();
             _settings.Save();
 
             MessageBox.Show("设置已保存", "提示", MessageBoxButton.OK, MessageBoxImage.Information);

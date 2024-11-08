@@ -1,11 +1,15 @@
 using System;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using Microsoft.Web.WebView2.Core;
 using System.IO;
 using System.Text;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using System.Net.Http;
+using System.Linq;
+using System.Collections.Generic;
 
 namespace zuanke8
 {
@@ -196,16 +200,19 @@ namespace zuanke8
                     <body>
                         {content}
                         <script>
+                            // 处理图片点击
                             document.querySelectorAll('img').forEach(function(img) {{
                                 img.onclick = function() {{
                                     window.open(this.src, '_blank');
                                 }};
                             }});
                             
+                            // 处理链接打开方式
                             document.querySelectorAll('a').forEach(function(a) {{
                                 a.target = '_blank';
                             }});
                             
+                            // 处理纯文本格式化
                             document.querySelectorAll('.t_f').forEach(function(content) {{
                                 if (!content.querySelector('img') && !content.querySelector('a')) {{
                                     content.innerHTML = content.innerHTML
@@ -221,12 +228,41 @@ namespace zuanke8
                     </body>
                     </html>";
 
-                // 直接设置 HTML 内容
+                // 设置 HTML 内容
                 WebView.CoreWebView2.NavigateToString(html);
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"加载帖子内容失败：{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async Task SendBarkNotification(string title, string content)
+        {
+            try
+            {
+                var barkUrl = AppSettings.Instance.BarkUrl?.TrimEnd('/');
+                if (string.IsNullOrEmpty(barkUrl)) return;
+
+                // 检查内容是否为 URL
+
+                using var client = new HttpClient();
+                var encodedTitle = Uri.EscapeDataString(title);
+                var encodedContent = Uri.EscapeDataString(content);
+
+                // 根据内容类型构建推送 URL
+                var pushUrl = $"{barkUrl}/{encodedTitle}/{encodedContent}?isArchive=1&autoCopy=1";
+                
+                var response = await client.GetAsync(pushUrl);
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new Exception($"推送失败，状态码：{response.StatusCode}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"发送Bark通知失败：{ex.Message}");
+                throw; // 重新抛出异常以便显示错误消息
             }
         }
 
@@ -301,6 +337,41 @@ namespace zuanke8
 
             // 清理资源
             WebView?.Dispose();
+        }
+
+        private async void PushButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // 获取选中的文本
+                var result = await WebView.CoreWebView2.ExecuteScriptAsync("window.getSelection().toString();");
+                var selectedText = System.Text.Json.JsonSerializer.Deserialize<string>(result);
+
+                if (string.IsNullOrWhiteSpace(selectedText))
+                {
+                    MessageBox.Show("请先选择要推送的内容", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                // 推送选中的内容
+                await SendBarkNotification(_post.Title, selectedText);
+
+                // 显示成功提示
+                var button = sender as Button;
+                if (button != null)
+                {
+                    var originalContent = button.Content;
+                    button.Content = "✓";
+                    button.IsEnabled = false;
+                    await Task.Delay(1000);
+                    button.Content = originalContent;
+                    button.IsEnabled = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"推送失败：{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
     }
 } 

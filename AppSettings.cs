@@ -59,6 +59,20 @@ namespace zuanke8
             }
         }
 
+        private string _barkUrl;
+        public string BarkUrl
+        {
+            get => _barkUrl;
+            set
+            {
+                if (_barkUrl != value)
+                {
+                    _barkUrl = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
         private static AppSettings? _instance;
         public static AppSettings Instance => _instance ??= Load();
 
@@ -101,6 +115,7 @@ namespace zuanke8
                             else if (key == "EnableNotification") settings.EnableNotification = bool.Parse(value);
                             else if (key == "OnlyHighlightNotification") settings.OnlyHighlightNotification = bool.Parse(value);
                             else if (key == "IsTopMost") settings.IsTopMost = bool.Parse(value);
+                            else if (key == "BarkUrl") settings.BarkUrl = value;
                             break;
                         case "Blacklist":
                             settings.Blacklist.Add(value);
@@ -131,6 +146,7 @@ namespace zuanke8
                 writer.WriteLine($"EnableNotification={EnableNotification}");
                 writer.WriteLine($"OnlyHighlightNotification={OnlyHighlightNotification}");
                 writer.WriteLine($"IsTopMost={IsTopMost}");
+                writer.WriteLine($"BarkUrl={BarkUrl}");
 
                 // 保存黑名单
                 writer.WriteLine("\n[Blacklist]");
