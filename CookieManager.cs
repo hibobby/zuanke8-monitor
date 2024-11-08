@@ -113,5 +113,10 @@ namespace zuanke8
                 return false;
             }
         }
+
+        public static string GetCookie()
+        {
+            return LoadCookie();
+        }
     }
 } 

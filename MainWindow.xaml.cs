@@ -7,7 +7,6 @@ using System.Windows.Media;
 using System.Windows.Controls;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using zuanke8.Services;
 using zuanke8.ViewModels;
 using System.Diagnostics;
 using System.Threading.Tasks;
@@ -398,11 +397,24 @@ namespace zuanke8
         private void UpdateCounts()
         {
             var allPosts = _postManager.GetPosts(_orderByLastReply);
-            var visiblePosts = allPosts.Where(p => !p.IsHidden);
+            var visiblePosts = allPosts.AsEnumerable();
+
+            // 根据当前模式决定过滤条件
             if (ShowFavoritesOnly)
             {
+                // 收藏模式：只过滤收藏的帖子（包括隐藏的）
                 visiblePosts = visiblePosts.Where(p => p.IsFavorite);
             }
+            else
+            {
+                // 普通模式：过滤掉隐藏的帖子
+                visiblePosts = visiblePosts.Where(p => !p.IsHidden);
+            }
+
+            // 应用黑名单过滤
+            visiblePosts = visiblePosts.Where(p => !_settings.Blacklist.Any(keyword => 
+                p.Title.Contains(keyword, StringComparison.OrdinalIgnoreCase) || 
+                p.Author.Contains(keyword, StringComparison.OrdinalIgnoreCase)));
 
             UnreadCount = visiblePosts.Count(p => !p.IsRead);
             TotalCount = visiblePosts.Count();
@@ -488,22 +500,37 @@ namespace zuanke8
 
             try
             {
-                var allPosts = _postManager.GetPosts(_orderByLastReply)
-                    .Where(p => !p.IsHidden)
-                    .Where(p => !_settings.Blacklist.Any(keyword => 
-                        p.Title.Contains(keyword, StringComparison.OrdinalIgnoreCase) || 
-                        p.Author.Contains(keyword, StringComparison.OrdinalIgnoreCase)))
-                    .Where(p => !ShowFavoritesOnly || p.IsFavorite)
-                    .Select(p => 
-                    {
-                        var viewModel = new PostViewModel(p);
-                        viewModel.IsHighlight = _settings.Highlights.Any(keyword =>
-                            p.Title.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
-                            p.Author.Contains(keyword, StringComparison.OrdinalIgnoreCase));
-                        return viewModel;
-                    });
+                var allPosts = _postManager.GetPosts(_orderByLastReply);
+                var query = allPosts.AsEnumerable();
 
-                var pagedPosts = allPosts.Skip(pageIndex * PageSize).Take(PageSize);
+                // 修改过滤逻辑
+                if (ShowFavoritesOnly)
+                {
+                    // 收藏模式：只显示收藏的帖子（包括隐藏的）
+                    query = query.Where(p => p.IsFavorite);
+                }
+                else
+                {
+                    // 普通模式：过滤掉隐藏的帖子
+                    query = query.Where(p => !p.IsHidden);
+                }
+
+                // 应用黑名单过滤
+                query = query.Where(p => !_settings.Blacklist.Any(keyword => 
+                    p.Title.Contains(keyword, StringComparison.OrdinalIgnoreCase) || 
+                    p.Author.Contains(keyword, StringComparison.OrdinalIgnoreCase)));
+
+                // 转换为 ViewModels 并应用高亮
+                var filteredPosts = query.Select(p => 
+                {
+                    var viewModel = new PostViewModel(p);
+                    viewModel.IsHighlight = _settings.Highlights.Any(keyword =>
+                        p.Title.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
+                        p.Author.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+                    return viewModel;
+                });
+
+                var pagedPosts = filteredPosts.Skip(pageIndex * PageSize).Take(PageSize);
                 foreach (var post in pagedPosts)
                 {
                     Posts.Add(post);
@@ -618,6 +645,27 @@ namespace zuanke8
                     scrollViewer.ScrollToVerticalOffset(_pendingScrollOffset);
                     _pendingScrollOffset = -1;
                 }
+            }
+        }
+
+        private void OpenPreviewButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement element && element.DataContext is PostViewModel post)
+            {
+                var postData = new Post
+                {
+                    PostId = post.PostId,
+                    Title = post.Title,
+                    Url = post.Url,
+                    Author = post.Author,
+                    PostTime = post.PostTime,
+                    LastReplyTime = post.LastReplyTime,
+                    LastReplyUser = post.LastReplyUser,
+                    ReplyCount = post.ReplyCount,
+                    ViewCount = post.ViewCount
+                };
+                
+                PostPreview.ShowPreview(postData, this);
             }
         }
     }

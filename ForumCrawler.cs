@@ -241,5 +241,115 @@ namespace zuanke8
                 return null;
             }
         }
+
+        public async Task<string> FetchPostContent(string url)
+        {
+            try
+            {
+                using var client = new HttpClient();
+                // 设置 Headers
+                client.DefaultRequestHeaders.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7");
+                client.DefaultRequestHeaders.Add("Accept-Language", "zh-CN,zh;q=0.9,zh-TW;q=0.8,en;q=0.7");
+                client.DefaultRequestHeaders.Add("Cache-Control", "max-age=0");
+                client.DefaultRequestHeaders.Add("Cookie", CookieManager.GetCookie());
+                client.DefaultRequestHeaders.Add("Upgrade-Insecure-Requests", "1");
+                client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36");
+
+                // 获取页面内容
+                var response = await client.GetByteArrayAsync(url);
+                var html = Encoding.GetEncoding("GBK").GetString(response);
+                
+                // 使用正则表达式提取帖子内容
+                var match = Regex.Match(html, @"<div class=""pcb"">(.*?)<div id=""comment_", RegexOptions.Singleline);
+                if (match.Success)
+                {
+                    var content = match.Groups[1].Value;
+                    // 清理内容，只保留需要的部分
+                    content = CleanPostContent(content);
+                    Debug.WriteLine($"提取到的原始内容：{content}");
+                    return content;
+                }
+                
+                Debug.WriteLine("未找到帖子内容");
+                return "无法获取帖子内容";
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"获取帖子内容失败：{ex.Message}");
+                return $"获取帖子内容失败：{ex.Message}";
+            }
+        }
+
+        private string CleanPostContent(string html)
+        {
+            try
+            {
+                // 移除脚本标签及内容
+                html = Regex.Replace(html, @"<script[\s\S]*?</script>", "", RegexOptions.IgnoreCase);
+                
+                // 移除 ignore_js_op 标签
+                html = Regex.Replace(html, @"<ignore_js_op>|</ignore_js_op>", "");
+                
+                // 处理图片
+                html = Regex.Replace(html, @"<img[^>]*?zoomfile=""([^""]+)""[^>]*?>", m => 
+                {
+                    var imgUrl = m.Groups[1].Value;
+                    if (!imgUrl.StartsWith("http"))
+                    {
+                        imgUrl = imgUrl.StartsWith("/") ? 
+                            $"https://www.zuanke8.com{imgUrl}" : 
+                            $"https://www.zuanke8.com/{imgUrl}";
+                    }
+                    return $@"<img src=""{imgUrl}"" style=""max-width:100%; height:auto; cursor:pointer;"" onclick=""window.open('{imgUrl}', '_blank')"">";
+                });
+
+                // 处理普通图片
+                html = Regex.Replace(html, @"<img[^>]*?src=""([^""]+)""[^>]*?>", m => 
+                {
+                    var imgUrl = m.Groups[1].Value;
+                    if (!imgUrl.StartsWith("http"))
+                    {
+                        imgUrl = imgUrl.StartsWith("/") ? 
+                            $"https://www.zuanke8.com{imgUrl}" : 
+                            $"https://www.zuanke8.com/{imgUrl}";
+                    }
+                    return $@"<img src=""{imgUrl}"" style=""max-width:100%; height:auto; cursor:pointer;"" onclick=""window.open('{imgUrl}', '_blank')"">";
+                });
+                
+                // 处理链接
+                html = Regex.Replace(html, @"<a\s+href=""(?!http)([^""]+)""", m => 
+                {
+                    var href = m.Groups[1].Value;
+                    return $@"<a href=""https://www.zuanke8.com/{href}"" target=""_blank""";
+                });
+
+                // 移除所有 class 和 id 属性
+                html = Regex.Replace(html, @"\s+(?:class|id)=""[^""]*""", "");
+                
+                // 移除所有 onclick 事件（除了我们添加的图片点击事件）
+                html = Regex.Replace(html, @"\s+onclick=""(?!window\.open\('[^']+', '_blank'\))([^""]+)""", "");
+                
+                // 移除其他可能的 JavaScript 事件
+                html = Regex.Replace(html, @"\s+on\w+=""[^""]*""", "");
+                
+                // 移除空的 div 标签
+                html = Regex.Replace(html, @"<div\s*></div>", "");
+                
+                // 移除提示框
+                html = Regex.Replace(html, @"<div class=""tip.*?</div>", "", RegexOptions.Singleline);
+                
+                // 移除 aimg_tip
+                html = Regex.Replace(html, @"<div class=""[^""]*aimg_tip[^""]*"".*?</div>", "", RegexOptions.Singleline);
+                
+                Debug.WriteLine("清理后的内容：" + html);
+                
+                return html;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"清理内容时出错：{ex.Message}");
+                return html;
+            }
+        }
     }
 } 

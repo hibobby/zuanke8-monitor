@@ -263,6 +263,15 @@
                                     <StackPanel Grid.Column="1" 
                                                 Orientation="Horizontal"
                                                 VerticalAlignment="Top">
+                                        <!-- 打开预览按钮 -->
+                                        <Button Content="&#xE8A7;"
+                                                Click="OpenPreviewButton_Click"
+                                                ToolTip="打开预览"
+                                                Width="24"
+                                                Height="24"
+                                                Margin="0,0,4,0"
+                                                Style="{StaticResource IconButtonStyle}"/>
+                                        <!-- 现有的收藏按钮 -->
                                         <Button Content="&#xE734;"
                                                 Click="FavoriteButton_Click"
                                                 ToolTip="收藏"
@@ -279,6 +288,7 @@
                                                 </Style>
                                             </Button.Style>
                                         </Button>
+                                        <!-- 现有的隐藏按钮 -->
                                         <Button Content="&#xE711;"
                                                 Click="HideButton_Click"
                                                 ToolTip="不再显示"

@@ -45,6 +45,20 @@ namespace zuanke8
             }
         }
 
+        private bool _showFavoritesOnly;
+        public bool ShowFavoritesOnly
+        {
+            get => _showFavoritesOnly;
+            set
+            {
+                if (_showFavoritesOnly != value)
+                {
+                    _showFavoritesOnly = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
         private static AppSettings? _instance;
         public static AppSettings Instance => _instance ??= Load();
 

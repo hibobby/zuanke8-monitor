@@ -108,11 +108,9 @@ namespace zuanke8
         {
             lock (_lock)
             {
-                var query = _posts.Where(p => !p.IsHidden);
-
                 var orderedPosts = orderByLastReply
-                    ? query.OrderByDescending(p => p.LastReplyTime)
-                    : query.OrderByDescending(p => p.PostTime);
+                    ? _posts.OrderByDescending(p => p.LastReplyTime)
+                    : _posts.OrderByDescending(p => p.PostTime);
 
                 return new ObservableCollection<Post>(orderedPosts);
             }
