@@ -261,8 +261,7 @@ namespace zuanke8
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"发送Bark通知失败：{ex.Message}");
-                throw; // 重新抛出异常以便显示错误消息
+                throw;
             }
         }
 

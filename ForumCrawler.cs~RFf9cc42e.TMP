@@ -132,6 +132,8 @@ namespace zuanke8
             catch (Exception ex)
             {
                 Debug.WriteLine($"爬取失败：{ex.Message}");
+                Application.Current.Dispatcher.Invoke(() => 
+                    MessageBox.Show($"获取帖子失败：{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error));
             }
             finally
             {
